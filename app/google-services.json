@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "200970196745",
+    "project_id": "work-monitoring-eb305",
+    "storage_bucket": "work-monitoring-eb305.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:200970196745:android:49d055895668db2017e5d8",
+        "android_client_info": {
+          "package_name": "com.example.workmonitoring"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCd5lCknk53DTsNmmxAy84hK7E86bN-1Wo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
