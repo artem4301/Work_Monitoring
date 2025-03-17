@@ -1,6 +1,5 @@
-package com.example.facedetection
+package com.example.workmonitoring.face
 
-import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import org.tensorflow.lite.Interpreter
@@ -12,7 +11,6 @@ class FaceNetModel(private val assetManager: AssetManager) {
     private val inputSize = 160
 
     init {
-        // Конвертация модели из ByteArray в ByteBuffer
         val modelFile = loadModelFile("facenet.tflite")
         interpreter = Interpreter(modelFile)
     }
@@ -29,10 +27,8 @@ class FaceNetModel(private val assetManager: AssetManager) {
     fun getFaceEmbeddings(bitmap: Bitmap): FloatArray? {
         val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
         val input = preprocessBitmap(resizedBitmap)
-
         val output = Array(1) { FloatArray(128) }
         interpreter.run(input, output)
-
         return output[0]
     }
 
@@ -44,7 +40,6 @@ class FaceNetModel(private val assetManager: AssetManager) {
                 }
             }
         }
-
         for (y in 0 until inputSize) {
             for (x in 0 until inputSize) {
                 val pixel = bitmap.getPixel(x, y)
@@ -53,7 +48,11 @@ class FaceNetModel(private val assetManager: AssetManager) {
                 input[0][y][x][2] = (pixel and 0xFF) / 255.0f
             }
         }
-
         return input
+    }
+
+
+    fun close() {
+        interpreter.close()
     }
 }

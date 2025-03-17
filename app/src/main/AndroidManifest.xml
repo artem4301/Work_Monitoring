@@ -13,19 +13,19 @@
         android:theme="@style/Theme.WorkMonitoring"
         tools:targetApi="31">
         <activity
-            android:name=".FaceControlActivity"
+            android:name=".ui.FaceControlActivity"
             android:exported="false" />
         <activity
-            android:name=".RegisterActivity"
+            android:name=".ui.RegisterActivity"
             android:exported="false" />
         <activity
-            android:name=".HomeActivity"
+            android:name=".ui.HomeActivity"
             android:exported="false" />
         <activity
-            android:name=".ResetPasswordActivity"
+            android:name=".ui.ResetPasswordActivity"
             android:exported="false" />
         <activity
-            android:name=".LoginActivity"
+            android:name=".ui.LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
