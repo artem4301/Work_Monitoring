@@ -21,14 +21,13 @@ import java.io.IOException
 class HomeActivity : AppCompatActivity() {
 
     private lateinit var homeViewModel: HomeViewModel
-    private lateinit var imageView: ImageView
-    private var roppedFaceBitmap: Bitmap? = null
+    private lateinit var facePreviewImage: ImageView
 
-    private val getImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
+    private val imagePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { imageUri: Uri? ->
+        imageUri?.let {
             try {
-                val bitmap = MediaStore.Images.Media.getBitmap(contentResolver, it)
-                homeViewModel.processImage(this, bitmap) { message ->
+                val selectedBitmap = MediaStore.Images.Media.getBitmap(contentResolver, it)
+                homeViewModel.processSelectedImage(selectedBitmap) { message ->
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: IOException) {
@@ -42,39 +41,40 @@ class HomeActivity : AppCompatActivity() {
         setContentView(R.layout.activity_home)
 
         val factory = HomeViewModelFactory(assets)
-        homeViewModel = ViewModelProvider(this, factory).get(HomeViewModel::class.java)
+        homeViewModel = ViewModelProvider(this, factory)[HomeViewModel::class.java]
 
-        imageView = findViewById(R.id.imageView)
-        val btnSelectImage = findViewById<Button>(R.id.btnSelectImage)
-        val btnSaveEmbeddings = findViewById<Button>(R.id.btnSaveEmbeddings)
-        val btnOnWork = findViewById<Button>(R.id.btnOnWork)
-        val logoutButton = findViewById<Button>(R.id.logoutButton)
+        facePreviewImage = findViewById(R.id.facePreviewImage)
+        val btnSelectFaceImage = findViewById<Button>(R.id.btnSelectFaceImage)
+        val btnSaveFaceEmbeddings = findViewById<Button>(R.id.btnSaveFaceEmbeddings)
+        val btnStartFaceControl = findViewById<Button>(R.id.btnStartFaceControl)
+        val btnLogout = findViewById<Button>(R.id.btnLogout)
 
-        homeViewModel.croppedFaceBitmap.observe(this) { bitmap ->
-            imageView.setImageBitmap(bitmap)
+        homeViewModel.detectedFaceBitmap.observe(this) { detectedFaceBitmap ->
+            facePreviewImage.setImageBitmap(detectedFaceBitmap)
         }
 
-        btnSelectImage.setOnClickListener { getImageLauncher.launch("image/*") }
+        btnSelectFaceImage.setOnClickListener { imagePickerLauncher.launch("image/*") }
 
-        btnSaveEmbeddings.setOnClickListener {
-            homeViewModel.saveEmbeddings { message ->
+        btnSaveFaceEmbeddings.setOnClickListener {
+            homeViewModel.saveFaceEmbeddings { message ->
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
             }
         }
 
-        btnOnWork.setOnClickListener {
-            homeViewModel.checkUserEmbeddings({
+        btnStartFaceControl.setOnClickListener {
+            homeViewModel.checkStoredEmbeddings({
                 startActivity(Intent(this, FaceControlActivity::class.java))
             }, { error ->
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
             })
         }
 
-        logoutButton.setOnClickListener {
-            homeViewModel.logout()
+        btnLogout.setOnClickListener {
+            homeViewModel.logoutUser()
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }
     }
 }
+
 

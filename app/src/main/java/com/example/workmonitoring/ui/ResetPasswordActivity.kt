@@ -3,6 +3,7 @@ package com.example.workmonitoring.ui
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -21,16 +22,22 @@ class ResetPasswordActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_reset_password)
 
-        val emailEditText = findViewById<EditText>(R.id.emailEditText)
-        val resetPasswordButton = findViewById<Button>(R.id.resetPasswordButton)
+        val emailInput = findViewById<EditText>(R.id.emailInput)
+        val btnResetPassword = findViewById<Button>(R.id.btnResetPassword)
+        val btnBack = findViewById<Button>(R.id.btnBack)
+        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
 
-        resetPasswordButton.setOnClickListener {
-            val email = emailEditText.text.toString().trim()
+        btnResetPassword.setOnClickListener {
+            val email = emailInput.text.toString().trim()
             if (email.isNotEmpty()) {
                 resetPasswordViewModel.resetPassword(email)
             } else {
                 Toast.makeText(this, "Введите email", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        btnBack.setOnClickListener {
+            finish()
         }
 
         resetPasswordViewModel.resetPasswordStatus.observe(this) { result ->
@@ -42,3 +49,4 @@ class ResetPasswordActivity : AppCompatActivity() {
         }
     }
 }
+

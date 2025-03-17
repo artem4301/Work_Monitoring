@@ -1,8 +1,10 @@
 package com.example.workmonitoring.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -19,14 +21,25 @@ class RegisterActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
 
-        val emailEditText = findViewById<EditText>(R.id.emailEditText)
-        val passwordEditText = findViewById<EditText>(R.id.passwordEditText)
-        val registerButton = findViewById<Button>(R.id.registerButton)
+        val emailInput = findViewById<EditText>(R.id.emailInput)
+        val passwordInput = findViewById<EditText>(R.id.passwordInput)
+        val btnSignUp = findViewById<Button>(R.id.btnSignUp)
+        val btnSignIn = findViewById<Button>(R.id.btnSignIn)
+        val btnResetPassword = findViewById<Button>(R.id.btnResetPassword)
+        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
 
-        registerButton.setOnClickListener {
-            val email = emailEditText.text.toString().trim()
-            val password = passwordEditText.text.toString().trim()
+        btnSignUp.setOnClickListener {
+            val email = emailInput.text.toString().trim()
+            val password = passwordInput.text.toString().trim()
             registerViewModel.register(email, password)
+        }
+
+        btnSignIn.setOnClickListener {
+            startActivity(Intent(this, LoginActivity::class.java))
+        }
+
+        btnResetPassword.setOnClickListener {
+            startActivity(Intent(this, ResetPasswordActivity::class.java))
         }
 
         registerViewModel.registerResult.observe(this) { result ->
@@ -39,3 +52,4 @@ class RegisterActivity : AppCompatActivity() {
         }
     }
 }
+

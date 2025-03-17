@@ -15,34 +15,42 @@ import com.example.workmonitoring.face.FaceNetModel
 import com.google.firebase.auth.FirebaseAuth
 
 class FaceControlActivity : AppCompatActivity() {
-    private lateinit var imageView: ImageView
-    private lateinit var tvResult: TextView
+    private lateinit var imagePreview: ImageView
+    private lateinit var similarityTextView: TextView
     private val viewModel: FaceControlViewModel by viewModels {
         FaceControlViewModelFactory(FaceNetModel(assets), FirebaseRepository(), FirebaseAuth.getInstance())
     }
 
-    private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap: Bitmap? ->
-        bitmap?.let { viewModel.processCapturedImage(it) }
+    // Запуск камеры
+    private val cameraLauncher = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { capturedBitmap: Bitmap? ->
+        capturedBitmap?.let { viewModel.processCapturedImage(it) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_face_control)
 
-        imageView = findViewById(R.id.imageView)
-        tvResult = findViewById(R.id.tvResult)
-        val btnStartCamera = findViewById<Button>(R.id.btnStartCamera)
+        imagePreview = findViewById(R.id.imagePreview)
+        similarityTextView = findViewById(R.id.similarityTextView)
+        val btnCaptureFace = findViewById<Button>(R.id.btnCaptureFace)
+        val btnBack = findViewById<Button>(R.id.btnBack)
 
-        btnStartCamera.setOnClickListener { takePictureLauncher.launch(null) }
+        // Запуск камеры
+        btnCaptureFace.setOnClickListener { cameraLauncher.launch(null) }
 
-        viewModel.faceBitmap.observe(this) { bitmap ->
-            bitmap?.let { imageView.setImageBitmap(it) }
+        // Назад
+        btnBack.setOnClickListener { finish() }
+
+        // Отображение захваченного изображения
+        viewModel.faceBitmap.observe(this) { detectedFace ->
+            detectedFace?.let { imagePreview.setImageBitmap(it) }
         }
 
+        // Отображение результата распознавания
         viewModel.verificationResult.observe(this) { result ->
-            result.onSuccess { similarity ->
-                tvResult.text = "Схожесть: ${"%.2f".format(similarity)}%"
-                if (similarity >= 70) {
+            result.onSuccess { similarityScore ->
+                similarityTextView.text = "Схожесть: ${"%.2f".format(similarityScore)}%"
+                if (similarityScore >= 70) {
                     Toast.makeText(this, "Фотоконтроль пройден!", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Фотоконтроль не пройден!", Toast.LENGTH_SHORT).show()

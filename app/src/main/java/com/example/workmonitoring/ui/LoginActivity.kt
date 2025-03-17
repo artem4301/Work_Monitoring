@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -20,23 +21,24 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        val emailEditText = findViewById<EditText>(R.id.emailEditText)
-        val passwordEditText = findViewById<EditText>(R.id.passwordEditText)
-        val loginButton = findViewById<Button>(R.id.loginButton)
-        val registerButton = findViewById<Button>(R.id.registerButton)
-        val resetPasswordButton = findViewById<Button>(R.id.resetPasswordButton)
+        val emailInput = findViewById<EditText>(R.id.emailInput)
+        val passwordInput = findViewById<EditText>(R.id.passwordInput)
+        val btnLogin = findViewById<Button>(R.id.btnLogin)
+        val btnSignUp = findViewById<Button>(R.id.btnSignUp)
+        val btnResetPassword = findViewById<Button>(R.id.btnResetPassword)
+        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
 
-        loginButton.setOnClickListener {
-            val email = emailEditText.text.toString().trim()
-            val password = passwordEditText.text.toString().trim()
+        btnLogin.setOnClickListener {
+            val email = emailInput.text.toString().trim()
+            val password = passwordInput.text.toString().trim()
             loginViewModel.login(email, password)
         }
 
-        registerButton.setOnClickListener {
+        btnSignUp.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
 
-        resetPasswordButton.setOnClickListener {
+        btnResetPassword.setOnClickListener {
             startActivity(Intent(this, ResetPasswordActivity::class.java))
         }
 
@@ -50,3 +52,4 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 }
+

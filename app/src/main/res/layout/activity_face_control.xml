@@ -1,51 +1,92 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center">
+    android:background="#FFFFFF">
 
-    <!-- Заголовок -->
-    <TextView
-        android:id="@+id/tvTitle"
+    <!-- Back button -->
+    <Button
+        android:id="@+id/btnBack"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Фотоконтроль"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginBottom="24dp" />
+        android:text="← Back"
+        android:textAllCaps="false"
+        android:textColor="?attr/colorPrimary"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="32dp"
+        android:layout_marginStart="16dp"/>
 
-    <!-- ImageView для отображения сделанного снимка -->
+    <!-- Instruction text -->
+    <TextView
+        android:id="@+id/instructionText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Align your face and tap Capture"
+        android:textSize="14sp"
+        app:layout_constraintTop_toBottomOf="@id/btnBack"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"/>
+
+    <!-- Captured image preview (Используется вместо FrameLayout) -->
     <ImageView
-        android:id="@+id/imageView"
+        android:id="@+id/imagePreview"
         android:layout_width="200dp"
         android:layout_height="200dp"
-        android:layout_gravity="center"
         android:scaleType="centerCrop"
-        android:background="@android:color/darker_gray"
-        android:contentDescription="Снимок с камеры"
-        android:layout_marginBottom="16dp" />
+        android:background="@drawable/rounded_border"
+        app:layout_constraintTop_toBottomOf="@id/instructionText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"/>
 
-    <!-- Кнопка для запуска камеры -->
-    <Button
-        android:id="@+id/btnStartCamera"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Сделать селфи"
-        android:padding="12dp"
-        android:layout_marginBottom="16dp" />
-
-    <!-- Текстовое поле для вывода результата фотоконтроля -->
+    <!-- Verification result text -->
     <TextView
-        android:id="@+id/tvResult"
+        android:id="@+id/similarityTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Результат фотоконтроля будет здесь"
+        android:text="Схожесть: - %"
         android:textSize="16sp"
-        android:gravity="center"
-        android:layout_marginTop="16dp" />
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        app:layout_constraintTop_toBottomOf="@id/imagePreview"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
 
-</LinearLayout>
+    <!-- Capture Face button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCaptureFace"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Capture Face"
+        android:textAllCaps="true"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="?attr/colorPrimary"
+        app:cornerRadius="4dp"
+        app:layout_constraintTop_toBottomOf="@id/similarityTextView"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="24dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"/>
+
+    <!-- Loading indicator -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+</androidx.constraintlayout.widget.ConstraintLayout>
