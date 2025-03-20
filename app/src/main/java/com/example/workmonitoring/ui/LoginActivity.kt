@@ -2,6 +2,7 @@ package com.example.workmonitoring.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
@@ -11,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.workmonitoring.R
 import com.example.workmonitoring.data.FirebaseRepository
 import com.example.workmonitoring.viewmodel.LoginViewModelFactory
+import com.google.firebase.auth.FirebaseAuth
 
 class LoginActivity : AppCompatActivity() {
     private val loginViewModel: LoginViewModel by viewModels {
@@ -19,6 +21,17 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ✅ Проверяем, залогинен ли пользователь
+        val auth = FirebaseAuth.getInstance()
+        if (auth.currentUser != null) {
+            // Если пользователь уже залогинен, переходим в HomeActivity
+            startActivity(Intent(this, HomeActivity::class.java))
+            finish()
+            return
+        }
+
+        // Если не залогинен, показываем экран входа
         setContentView(R.layout.activity_login)
 
         val emailInput = findViewById<EditText>(R.id.emailInput)
@@ -31,6 +44,15 @@ class LoginActivity : AppCompatActivity() {
         btnLogin.setOnClickListener {
             val email = emailInput.text.toString().trim()
             val password = passwordInput.text.toString().trim()
+
+            if (email.isEmpty() || password.isEmpty()) {
+                Toast.makeText(this, "Введите email и пароль!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // ✅ Показываем индикатор загрузки
+            progressBar.visibility = View.VISIBLE
+
             loginViewModel.login(email, password)
         }
 
@@ -44,12 +66,13 @@ class LoginActivity : AppCompatActivity() {
 
         loginViewModel.loginResult.observe(this) { result ->
             result.onSuccess {
+                progressBar.visibility = View.GONE  // ✅ Скрываем индикатор
                 startActivity(Intent(this, HomeActivity::class.java))
                 finish()
             }.onFailure { error ->
+                progressBar.visibility = View.GONE  // ✅ Скрываем индикатор
                 Toast.makeText(this, error.message, Toast.LENGTH_SHORT).show()
             }
         }
     }
 }
-

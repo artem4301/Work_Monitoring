@@ -23,7 +23,9 @@ class FaceControlActivity : AppCompatActivity() {
 
     // Запуск камеры
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { capturedBitmap: Bitmap? ->
-        capturedBitmap?.let { viewModel.processCapturedImage(it) }
+        capturedBitmap?.let { bitmap ->
+            viewModel.processCapturedImage(this, bitmap) // Передаём context
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,16 +50,12 @@ class FaceControlActivity : AppCompatActivity() {
 
         // Отображение результата распознавания
         viewModel.verificationResult.observe(this) { result ->
-            result.onSuccess { similarityScore ->
-                similarityTextView.text = "Схожесть: ${"%.2f".format(similarityScore)}%"
-                if (similarityScore >= 70) {
-                    Toast.makeText(this, "Фотоконтроль пройден!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Фотоконтроль не пройден!", Toast.LENGTH_SHORT).show()
-                }
+            result.onSuccess { similarityResults ->
+                similarityTextView.text = similarityResults.toString()
             }.onFailure { error ->
                 Toast.makeText(this, error.message, Toast.LENGTH_SHORT).show()
             }
         }
+
     }
 }

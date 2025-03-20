@@ -13,6 +13,9 @@
         android:theme="@style/Theme.WorkMonitoring"
         tools:targetApi="31">
         <activity
+            android:name=".ui.FaceRegistrationActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.FaceControlActivity"
             android:exported="false" />
         <activity
