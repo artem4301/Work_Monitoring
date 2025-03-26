@@ -56,4 +56,5 @@ dependencies {
     implementation(libs.tensorflow.lite)
     implementation(libs.tensorflow.lite.support)
     implementation("com.google.mlkit:face-detection:16.1.7")
+    implementation("com.github.steve1316:opencv-android-sdk:4.7.0")
 }
