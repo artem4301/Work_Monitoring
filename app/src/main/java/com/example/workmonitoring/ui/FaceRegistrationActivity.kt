@@ -55,29 +55,31 @@ class FaceRegistrationActivity : AppCompatActivity() {
             } else {
                 imagePreview.setImageBitmap(croppedFace)
 
-                viewModel.processCapturedImage(croppedFace) { success ->
-                    if (success) {
-                        photoIndex++
-                        if (photoIndex < instructions.size) {
-                            instructionTextView.text = instructions[photoIndex]
-                            btnStartRegistration.isEnabled = true
-                        } else {
-                            Log.d("FaceRegistration", "Сохраняем эмбеддинги...")
-                            viewModel.saveEmbeddings(
-                                onSuccess = {
-                                    Toast.makeText(this, "Регистрация завершена!", Toast.LENGTH_SHORT).show()
-                                    finish()
-                                },
-                                onFailure = { error ->
-                                    Toast.makeText(this, "Ошибка сохранения: $error", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-
-                        }
-                    } else {
-                        Toast.makeText(this, "Ошибка обработки лица, попробуйте снова!", Toast.LENGTH_SHORT).show()
+                viewModel.processCapturedImage(
+                    bitmap = croppedFace,
+                    index = photoIndex,
+                    context = this,
+                    onFail = { error ->
+                        Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
                         btnStartRegistration.isEnabled = true
                     }
+                )
+
+                photoIndex++
+                if (photoIndex < instructions.size) {
+                    instructionTextView.text = instructions[photoIndex]
+                    btnStartRegistration.isEnabled = true
+                } else {
+                    Log.d("FaceRegistration", "Сохраняем эмбеддинги...")
+                    viewModel.saveEmbeddings(
+                        onSuccess = {
+                            Toast.makeText(this, "Регистрация завершена!", Toast.LENGTH_SHORT).show()
+                            finish()
+                        },
+                        onFailure = { error ->
+                            Toast.makeText(this, "Ошибка сохранения: $error", Toast.LENGTH_SHORT).show()
+                        }
+                    )
                 }
             }
         }

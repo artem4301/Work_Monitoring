@@ -1,4 +1,4 @@
-package com.example.workmonitoring.ui
+package com.example.workmonitoring.viewmodel
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -8,8 +8,9 @@ import androidx.lifecycle.ViewModel
 import com.example.workmonitoring.data.FirebaseRepository
 import com.example.workmonitoring.face.FaceNetModel
 import com.example.workmonitoring.utils.FaceDetectionHelper
-import com.example.workmonitoring.utils.MathUtils
+import com.example.workmonitoring.utils.ImageQualityChecker
 import com.google.firebase.auth.FirebaseAuth
+import kotlin.math.sqrt
 
 class FaceControlViewModel(
     private val faceNetModel: FaceNetModel,
@@ -17,19 +18,37 @@ class FaceControlViewModel(
     private val auth: FirebaseAuth
 ) : ViewModel() {
 
-    private val _verificationResult = MutableLiveData<Result<Double>>()
-    val verificationResult: LiveData<Result<Double>> = _verificationResult
+    private val _verificationResult = MutableLiveData<Result<String>>()
+    val verificationResult: LiveData<Result<String>> = _verificationResult
 
     private val _faceBitmap = MutableLiveData<Bitmap?>()
     val faceBitmap: LiveData<Bitmap?> = _faceBitmap
 
-    fun processCapturedImage(context: Context, bitmap: Bitmap) {
+    fun processCapturedImage(bitmap: Bitmap, context: Context) {
+        // 1. Сначала проверяем качество снимка
+        if (ImageQualityChecker.isImageBlurred(bitmap)) {
+            _verificationResult.postValue(
+                Result.failure(Exception("Фото размытое. Попробуйте снова."))
+            )
+            return
+        }
+
+        if (ImageQualityChecker.isImageTooDark(bitmap)) {
+            _verificationResult.postValue(
+                Result.failure(Exception("Слишком тёмное фото. Включите свет или подойдите ближе к свету."))
+            )
+            return
+        }
+
+        // 2. Если качество OK - переходим к поиску лица
         FaceDetectionHelper.detectFace(context, bitmap) { croppedFace ->
             _faceBitmap.postValue(croppedFace)
             if (croppedFace != null) {
                 performFaceVerification(croppedFace)
             } else {
-                _verificationResult.postValue(Result.failure(Exception("Лицо не распознано!")))
+                _verificationResult.postValue(
+                    Result.failure(Exception("Лицо не распознано!"))
+                )
             }
         }
     }
@@ -37,28 +56,61 @@ class FaceControlViewModel(
     private fun performFaceVerification(faceBitmap: Bitmap) {
         val newEmbedding = faceNetModel.getFaceEmbeddings(faceBitmap)
         if (newEmbedding == null || newEmbedding.isEmpty()) {
-            _verificationResult.postValue(Result.failure(Exception("Ошибка генерации эмбеддингов!")))
+            _verificationResult.postValue(
+                Result.failure(Exception("Ошибка генерации эмбеддингов!"))
+            )
             return
         }
 
         val userId = auth.currentUser?.uid
         if (userId == null) {
-            _verificationResult.postValue(Result.failure(Exception("Пользователь не авторизован!")))
+            _verificationResult.postValue(
+                Result.failure(Exception("Пользователь не авторизован!"))
+            )
             return
         }
 
         firebaseRepository.getUserEmbeddings(userId, { embeddings ->
-            var bestSimilarity = 0.0
-            val newEmbeddingDoubles = newEmbedding.map { it.toDouble() }
+            val newDoubles = newEmbedding.map { it.toDouble() }
 
-            embeddings.forEach { storedEmbedding ->
-                val storedEmbeddingDoubles = storedEmbedding.map { it.toDouble() }
-                val distance = MathUtils.calculateCosineDistance(storedEmbeddingDoubles, newEmbeddingDoubles)
-                val similarity = ((1 - distance).coerceIn(0.0, 1.0)) * 100
-                bestSimilarity = maxOf(bestSimilarity, similarity)
+            var bestCosine = 0.0
+            var bestEuclidean = 0.0
+            var bestManhattan = 0.0
+
+            // Максимумы для L2-нормированных векторов
+            val maxL2Dist  = 2.0
+            val maxManDist = 2.0 * sqrt(128.0) // ~22.627
+
+            embeddings.forEachIndexed { index, storedEmbedding ->
+                val storedDoubles = storedEmbedding.map { it.toDouble() }
+
+                // Сырые расстояния
+                val cosDist = MathUtils.calculateCosineDistance(storedDoubles, newDoubles)
+                val l2Dist  = MathUtils.calculateEuclideanDistance(storedDoubles, newDoubles)
+                val manDist = MathUtils.calculateManhattanDistance(storedDoubles, newDoubles)
+
+                // (A) Косинусное сходство = (1 - cosDist)*100, clamp [0..100]
+                val cosSim = ((1.0 - cosDist).coerceIn(0.0, 1.0)) * 100.0
+
+                // (B) Евклидовое сходство = ((2 - l2Dist)/2)*100
+                val euclSim = ((maxL2Dist - l2Dist) / maxL2Dist).coerceIn(0.0, 1.0) * 100.0
+
+                // (C) Манхэттенское сходство = ((maxManDist - manDist)/maxManDist)*100
+                val manSim = ((maxManDist - manDist) / maxManDist).coerceIn(0.0, 1.0) * 100.0
+
+                bestCosine = maxOf(bestCosine, cosSim)
+                bestEuclidean = maxOf(bestEuclidean, euclSim)
+                bestManhattan = maxOf(bestManhattan, manSim)
             }
 
-            _verificationResult.postValue(Result.success(bestSimilarity))
+            val resultText = """
+                Косинусное сходство: ${"%.2f".format(bestCosine)}%
+                Евклидово сходство: ${"%.2f".format(bestEuclidean)}%
+                Манхэттенское сходство: ${"%.2f".format(bestManhattan)}%
+            """.trimIndent()
+
+            _verificationResult.postValue(Result.success(resultText))
+
         }, { error ->
             _verificationResult.postValue(Result.failure(Exception(error)))
         })

@@ -12,20 +12,28 @@ import androidx.appcompat.app.AppCompatActivity
 import com.example.workmonitoring.R
 import com.example.workmonitoring.data.FirebaseRepository
 import com.example.workmonitoring.face.FaceNetModel
+import com.example.workmonitoring.viewmodel.FaceControlViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 class FaceControlActivity : AppCompatActivity() {
+
     private lateinit var imagePreview: ImageView
     private lateinit var similarityTextView: TextView
+
     private val viewModel: FaceControlViewModel by viewModels {
-        FaceControlViewModelFactory(FaceNetModel(assets), FirebaseRepository(), FirebaseAuth.getInstance())
+        FaceControlViewModelFactory(
+            FaceNetModel(assets),
+            FirebaseRepository(),
+            FirebaseAuth.getInstance()
+        )
     }
 
-    // Запуск камеры
+    // Камера
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { capturedBitmap: Bitmap? ->
         capturedBitmap?.let { bitmap ->
-            viewModel.processCapturedImage(this, bitmap) // Передаём context
-        }
+            // Нет проверок качества - сразу отправляем во ViewModel
+            viewModel.processCapturedImage(bitmap, this)
+        } ?: Toast.makeText(this, "Ошибка получения фото", Toast.LENGTH_SHORT).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,25 +45,25 @@ class FaceControlActivity : AppCompatActivity() {
         val btnCaptureFace = findViewById<Button>(R.id.btnCaptureFace)
         val btnBack = findViewById<Button>(R.id.btnBack)
 
-        // Запуск камеры
-        btnCaptureFace.setOnClickListener { cameraLauncher.launch(null) }
+        btnCaptureFace.setOnClickListener {
+            cameraLauncher.launch(null)
+        }
 
-        // Назад
-        btnBack.setOnClickListener { finish() }
+        btnBack.setOnClickListener {
+            finish()
+        }
 
-        // Отображение захваченного изображения
+        // Подписываемся на LiveData из ViewModel
         viewModel.faceBitmap.observe(this) { detectedFace ->
             detectedFace?.let { imagePreview.setImageBitmap(it) }
         }
 
-        // Отображение результата распознавания
         viewModel.verificationResult.observe(this) { result ->
-            result.onSuccess { similarityResults ->
-                similarityTextView.text = similarityResults.toString()
+            result.onSuccess { resultText ->
+                similarityTextView.text = resultText.toString()
             }.onFailure { error ->
                 Toast.makeText(this, error.message, Toast.LENGTH_SHORT).show()
             }
         }
-
     }
 }

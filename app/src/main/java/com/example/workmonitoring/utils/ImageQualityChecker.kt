@@ -5,11 +5,13 @@ import org.opencv.android.Utils
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Core
+import org.opencv.core.MatOfDouble
 import org.opencv.imgproc.Imgproc
 
 object ImageQualityChecker {
 
-    fun isImageBlurred(bitmap: Bitmap, threshold: Double = 100.0): Boolean {
+    // Проверка на размытие
+    fun isImageBlurred(bitmap: Bitmap, threshold: Double = 10.0): Boolean {
         val mat = Mat()
         Utils.bitmapToMat(bitmap, mat)
 
@@ -19,36 +21,37 @@ object ImageQualityChecker {
         val laplacian = Mat()
         Imgproc.Laplacian(grayMat, laplacian, CvType.CV_64F)
 
-        val mean = Core.mean(laplacian).`val`[0]
-        val reshaped = laplacian.reshape(1, 1)
-        val dot = reshaped.dot(reshaped)
-        val variance = if (laplacian.total() > 0) {
-            dot / laplacian.total() - mean * mean
-        } else {
-            0.0
-        }
+        val mean = MatOfDouble()
+        val stdDev = MatOfDouble()
+        Core.meanStdDev(laplacian, mean, stdDev)
 
-        return variance < threshold
+        val stdDevValue = stdDev.toArray().firstOrNull() ?: 0.0
+        return stdDevValue < threshold
     }
 
-    fun isImageTooDark(bitmap: Bitmap, threshold: Int = 50): Boolean {
+
+
+    // Проверка на темноту изображения
+    fun isImageTooDark(bitmap: Bitmap, threshold: Int = 80): Boolean {
         val width = bitmap.width
         val height = bitmap.height
-        var totalBrightness = 0L
+        var totalBrightness = 0.0
+        var sampleCount = 0
 
-        for (x in 0 until width step 10) { // ускорим за счёт пропуска
+        for (x in 0 until width step 10) {
             for (y in 0 until height step 10) {
                 val pixel = bitmap.getPixel(x, y)
                 val r = (pixel shr 16) and 0xFF
                 val g = (pixel shr 8) and 0xFF
                 val b = pixel and 0xFF
-                val brightness = (r + g + b) / 3
+                val brightness = 0.299 * r + 0.587 * g + 0.114 * b
                 totalBrightness += brightness
+                sampleCount++
             }
         }
 
-        val sampleCount = (width / 10) * (height / 10)
         val avgBrightness = totalBrightness / sampleCount
         return avgBrightness < threshold
     }
+
 }

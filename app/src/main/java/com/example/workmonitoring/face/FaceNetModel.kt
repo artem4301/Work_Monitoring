@@ -2,6 +2,7 @@ package com.example.workmonitoring.face
 
 import android.content.res.AssetManager
 import android.graphics.Bitmap
+import android.util.Log
 import org.tensorflow.lite.Interpreter
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -29,7 +30,20 @@ class FaceNetModel(private val assetManager: AssetManager) {
         val input = preprocessBitmap(resizedBitmap)
         val output = Array(1) { FloatArray(128) }
         interpreter.run(input, output)
-        return output[0]
+        return l2Normalize(output[0])
+    }
+
+    private fun l2Normalize(embedding: FloatArray): FloatArray {
+        var sum = 0.0f
+        for (v in embedding) {
+            sum += v * v
+        }
+        val norm = kotlin.math.sqrt(sum)
+        return if (norm > 0f) {
+            FloatArray(embedding.size) { i -> embedding[i] / norm }
+        } else {
+            embedding
+        }
     }
 
     private fun preprocessBitmap(bitmap: Bitmap): Array<Array<Array<FloatArray>>> {

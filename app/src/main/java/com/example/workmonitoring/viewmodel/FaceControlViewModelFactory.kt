@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.workmonitoring.data.FirebaseRepository
 import com.example.workmonitoring.face.FaceNetModel
+import com.example.workmonitoring.viewmodel.FaceControlViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 class FaceControlViewModelFactory(
