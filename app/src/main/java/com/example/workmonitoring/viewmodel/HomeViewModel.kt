@@ -40,6 +40,21 @@ class HomeViewModel(
         })
     }
 
+    fun getUserWorkZone(onResult: (String) -> Unit, onFailure: (String) -> Unit) {
+        val userId = firebaseRepository.getCurrentUserId()
+        if (userId == null) {
+            onFailure("Пользователь не авторизован!")
+            return
+        }
+
+        firebaseRepository.getUserWorkZone(userId, { zone ->
+            onResult(zone)
+        }, { error ->
+            onFailure(error)
+        })
+    }
+
+
     fun logout() {
         firebaseRepository.logout()
     }

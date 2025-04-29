@@ -22,4 +22,11 @@ class LoginViewModel(private val firebaseRepository: FirebaseRepository) : ViewM
             _loginResult.value = Result.failure(Exception(error))
         })
     }
+
+    fun loadUserRole(uid: String, callback: (String) -> Unit) {
+        firebaseRepository.getUserRole(uid) { role ->
+            callback(role ?: "worker")  // если что-то пойдет не так — по умолчанию worker
+        }
+    }
+
 }

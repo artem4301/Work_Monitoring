@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.workmonitoring"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -49,6 +49,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation(libs.firebase.auth.ktx)
     implementation(libs.vision.common)
+    implementation(libs.androidx.tools.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -57,4 +58,5 @@ dependencies {
     implementation(libs.tensorflow.lite.support)
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.github.steve1316:opencv-android-sdk:4.7.0")
+    implementation("com.yandex.android:maps.mobile:4.5.0-full")
 }

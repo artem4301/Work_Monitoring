@@ -7,14 +7,14 @@ import com.example.workmonitoring.data.FirebaseRepository
 
 class RegisterViewModel(private val firebaseRepository: FirebaseRepository) : ViewModel() {
 
-    private val _registerResult = MutableLiveData<Result<Unit>>()
-    val registerResult: LiveData<Result<Unit>> get() = _registerResult
+    private val _registerResult = MutableLiveData<Result<String>>() // теперь строка = роль
+    val registerResult: LiveData<Result<String>> get() = _registerResult
 
-    fun register(firstName: String, lastName: String, email: String, password: String) {
+    fun register(firstName: String, lastName: String, email: String, password: String, role: String) {
         firebaseRepository.register(email, password, {
-            firebaseRepository.saveUserData(firstName, lastName, email) { success ->
+            firebaseRepository.saveUserData(firstName, lastName, email, role) { success ->
                 if (success) {
-                    _registerResult.postValue(Result.success(Unit))
+                    _registerResult.postValue(Result.success(role)) // теперь возвращаем роль
                 } else {
                     _registerResult.postValue(Result.failure(Exception("Ошибка сохранения данных пользователя")))
                 }
@@ -23,4 +23,5 @@ class RegisterViewModel(private val firebaseRepository: FirebaseRepository) : Vi
             _registerResult.postValue(Result.failure(Exception(error)))
         })
     }
+
 }

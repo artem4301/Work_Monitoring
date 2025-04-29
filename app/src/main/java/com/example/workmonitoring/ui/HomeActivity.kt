@@ -27,6 +27,16 @@ class HomeActivity : AppCompatActivity() {
         val btnFaceRegistration = findViewById<Button>(R.id.btnFaceRegistration)
         val btnFaceControl = findViewById<Button>(R.id.btnFaceControl)
         val btnLogout = findViewById<Button>(R.id.btnLogout)
+        val userZoneText = findViewById<TextView>(R.id.textViewWorkZone)
+
+        homeViewModel.getUserWorkZone(
+            onResult = { address ->
+                userZoneText.text = "Зона: $address"
+            },
+            onFailure = { error ->
+                Toast.makeText(this, "Ошибка загрузки зоны: $error", Toast.LENGTH_SHORT).show()
+            }
+        )
 
         // Устанавливаем email текущего пользователя
         userEmailText.text = homeViewModel.getUserEmail() ?: "Неизвестный пользователь"

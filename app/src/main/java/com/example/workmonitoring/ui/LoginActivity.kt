@@ -13,6 +13,7 @@ import com.example.workmonitoring.R
 import com.example.workmonitoring.data.FirebaseRepository
 import com.example.workmonitoring.viewmodel.LoginViewModelFactory
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class LoginActivity : AppCompatActivity() {
     private val loginViewModel: LoginViewModel by viewModels {
@@ -22,12 +23,35 @@ class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ✅ Проверяем, залогинен ли пользователь
         val auth = FirebaseAuth.getInstance()
+        val db = FirebaseFirestore.getInstance()
+
         if (auth.currentUser != null) {
-            // Если пользователь уже залогинен, переходим в HomeActivity
-            startActivity(Intent(this, HomeActivity::class.java))
-            finish()
+            val currentUserId = auth.currentUser!!.uid
+            db.collection("users")
+                .document(currentUserId)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        val role = document.getString("role")
+                        if (role == "manager") {
+                            startActivity(Intent(this, ManagerHomeActivity::class.java))
+                        } else {
+                            startActivity(Intent(this, HomeActivity::class.java))
+                        }
+                        finish()
+                    } else {
+                        // Пользователь залогинен, но нет данных в Firestore — сбрасываем авторизацию
+                        auth.signOut()
+                        Toast.makeText(this, "Пользователь не найден. Войдите снова.", Toast.LENGTH_SHORT).show()
+                        // Оставляем на LoginActivity
+                    }
+                }
+                .addOnFailureListener {
+                    auth.signOut()
+                    Toast.makeText(this, "Ошибка при получении данных пользователя. Войдите снова.", Toast.LENGTH_SHORT).show()
+                    // Оставляем на LoginActivity
+                }
             return
         }
 
@@ -66,13 +90,40 @@ class LoginActivity : AppCompatActivity() {
 
         loginViewModel.loginResult.observe(this) { result ->
             result.onSuccess {
-                progressBar.visibility = View.GONE  // ✅ Скрываем индикатор
-                startActivity(Intent(this, HomeActivity::class.java))
-                finish()
+                progressBar.visibility = View.GONE
+
+                val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@onSuccess
+                val db = FirebaseFirestore.getInstance()
+
+                db.collection("users").document(userId).get()
+                    .addOnSuccessListener { doc ->
+                        val role = doc.getString("role") ?: "worker"
+
+                        if (role == "manager") {
+                            startActivity(Intent(this, ManagerHomeActivity::class.java))
+                            finish()
+                        } else {
+                            // Проверка есть ли входящий запрос от управляющего
+                            db.collection("requests")
+                                .whereEqualTo("workerId", userId)
+                                .whereEqualTo("status", "pending")
+                                .get()
+                                .addOnSuccessListener { requests ->
+                                    if (!requests.isEmpty) {
+                                        startActivity(Intent(this, RequestApprovalActivity::class.java))
+                                    } else {
+                                        startActivity(Intent(this, HomeActivity::class.java))
+                                    }
+                                    finish()
+                                }
+                        }
+                    }
             }.onFailure { error ->
-                progressBar.visibility = View.GONE  // ✅ Скрываем индикатор
+                progressBar.visibility = View.GONE
                 Toast.makeText(this, error.message, Toast.LENGTH_SHORT).show()
             }
         }
+
+
     }
 }

@@ -12,37 +12,22 @@
         android:id="@+id/btnBack"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="← Back"
+        android:text="← Назад"
         android:textAllCaps="false"
         android:textColor="?attr/colorPrimary"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="10dp"
         android:layout_marginStart="16dp"/>
 
-    <!-- Instruction text -->
-    <TextView
-        android:id="@+id/instructionText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="Align your face and tap Capture"
-        android:textSize="14sp"
-        app:layout_constraintTop_toBottomOf="@id/btnBack"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"/>
-
-    <!-- Captured image preview (Используется вместо FrameLayout) -->
     <ImageView
         android:id="@+id/imagePreview"
         android:layout_width="200dp"
         android:layout_height="200dp"
         android:scaleType="centerCrop"
         android:background="@drawable/rounded_border"
-        app:layout_constraintTop_toBottomOf="@id/instructionText"
+        app:layout_constraintTop_toBottomOf="@id/btnBack"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="16dp"/>
@@ -66,7 +51,7 @@
         android:id="@+id/btnCaptureFace"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Capture Face"
+        android:text="Face id"
         android:textAllCaps="true"
         android:textColor="#FFFFFF"
         android:backgroundTint="?attr/colorPrimary"

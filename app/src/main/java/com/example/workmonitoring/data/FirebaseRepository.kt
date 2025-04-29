@@ -1,10 +1,10 @@
 package com.example.workmonitoring.data
 
 import android.util.Log
+import com.example.workmonitoring.model.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import java.util.*
 
 class FirebaseRepository {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -98,19 +98,22 @@ class FirebaseRepository {
             }
     }
 
-    fun saveUserData(firstName: String, lastName: String, email: String, onComplete: (Boolean) -> Unit) {
-        val userId = auth.currentUser?.uid ?: return
-        val userData = mapOf(
+    fun saveUserData(firstName: String, lastName: String, email: String, role: String, onComplete: (Boolean) -> Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return onComplete(false)
+
+        val userMap = mapOf(
             "firstName" to firstName,
             "lastName" to lastName,
-            "email" to email
+            "email" to email,
+            "role" to role
         )
 
         db.collection("users").document(userId)
-            .set(userData)
+            .set(userMap)
             .addOnSuccessListener { onComplete(true) }
             .addOnFailureListener { onComplete(false) }
     }
+
 
     /**
      * Сброс пароля по email.
@@ -127,6 +130,130 @@ class FirebaseRepository {
                 }
             }
     }
+
+    fun getUserRole(uid: String, callback: (String?) -> Unit) {
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(uid)
+            .get()
+            .addOnSuccessListener { document ->
+                val role = document.getString("role")
+                callback(role)
+            }
+            .addOnFailureListener {
+                callback(null)
+            }
+    }
+
+    fun getWorkers(callback: (List<User>) -> Unit) {
+        db.collection("users") // здесь было firestore
+            .whereEqualTo("role", "worker")
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val workers = querySnapshot.documents.mapNotNull { doc ->
+                    val user = doc.toObject(User::class.java)
+                    user?.uid = doc.id
+                    user
+                }
+                callback(workers)
+            }
+            .addOnFailureListener {
+                callback(emptyList())
+            }
+    }
+
+    fun sendRequest(workerId: String, callback: (Boolean) -> Unit) {
+        val managerId = auth.currentUser?.uid ?: return callback(false)
+        val request = hashMapOf(
+            "managerId" to managerId,
+            "workerId" to workerId,
+            "status" to "pending"
+        )
+        db.collection("requests") // здесь было firestore
+            .add(request)
+            .addOnSuccessListener { callback(true) }
+            .addOnFailureListener { callback(false) }
+    }
+
+    fun getAvailableWorkers(callback: (List<User>) -> Unit) {
+        val db = FirebaseFirestore.getInstance()
+        val auth = FirebaseAuth.getInstance()
+        val managerId = auth.currentUser?.uid ?: return callback(emptyList())
+
+        // Сначала загружаем всех работников
+        db.collection("users")
+            .whereEqualTo("role", "worker")
+            .get()
+            .addOnSuccessListener { workersSnapshot ->
+                val allWorkers = workersSnapshot.documents.mapNotNull { doc ->
+                    val user = doc.toObject(User::class.java)
+                    user?.uid = doc.id
+                    user
+                }
+
+                // Теперь загружаем все активные запросы для этого управляющего
+                db.collection("requests")
+                    .whereEqualTo("managerId", managerId)
+                    .whereIn("status", listOf("pending", "approved"))
+                    .get()
+                    .addOnSuccessListener { requestsSnapshot ->
+                        val requestedWorkerIds = requestsSnapshot.documents.mapNotNull { it.getString("workerId") }
+
+                        // Фильтруем работников, у которых еще НЕТ активного запроса
+                        val availableWorkers = allWorkers.filter { it.uid !in requestedWorkerIds }
+
+                        callback(availableWorkers)
+                    }
+                    .addOnFailureListener {
+                        callback(emptyList())
+                    }
+            }
+            .addOnFailureListener {
+                callback(emptyList())
+            }
+    }
+
+    fun assignWorkZone(
+        workerId: String,
+        address: String,
+        latitude: Double,
+        longitude: Double,
+        radius: Double,
+        callback: (Boolean) -> Unit
+    ) {
+        val db = FirebaseFirestore.getInstance()
+        val zoneData = mapOf(
+            "workZoneAddress" to address,
+            "workZoneLatitude" to latitude,
+            "workZoneLongitude" to longitude,
+            "workZoneRadius" to radius
+        )
+
+        db.collection("users")
+            .document(workerId)
+            .update(zoneData)
+            .addOnSuccessListener { callback(true) }
+            .addOnFailureListener { callback(false) }
+    }
+
+    fun getUserWorkZone(userId: String, onSuccess: (String) -> Unit, onFailure: (String) -> Unit) {
+        db.collection("users")
+            .document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val address = document.getString("workZoneAddress") ?: "Зона не выбрана"
+                    onSuccess(address)
+                } else {
+                    onFailure("Документ пользователя не найден")
+                }
+            }
+            .addOnFailureListener { e ->
+                onFailure(e.localizedMessage ?: "Ошибка при загрузке зоны")
+            }
+    }
+
+
 
     /**
      * Выход из аккаунта.
