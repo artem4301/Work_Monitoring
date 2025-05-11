@@ -253,6 +253,22 @@ class FirebaseRepository {
             }
     }
 
+    fun getUserName(userId: String, onSuccess: (String) -> Unit, onFailure: (String) -> Unit) {
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val firstName = document.getString("firstName") ?: ""
+                    val lastName = document.getString("lastName") ?: ""
+                    val fullName = "$lastName $firstName".trim()
+                    onSuccess(fullName)
+                } else {
+                    onFailure("Пользователь не найден")
+                }
+            }
+            .addOnFailureListener { e ->
+                onFailure("Ошибка загрузки данных: ${e.localizedMessage}")
+            }
+    }
 
 
     /**

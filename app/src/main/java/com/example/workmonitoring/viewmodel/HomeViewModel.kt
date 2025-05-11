@@ -40,6 +40,15 @@ class HomeViewModel(
         })
     }
 
+    fun getUserFullName(onResult: (String) -> Unit, onFailure: (String) -> Unit) {
+        val userId = firebaseRepository.getCurrentUserId()
+        if (userId == null) {
+            onFailure("Пользователь не авторизован")
+            return
+        }
+        firebaseRepository.getUserName(userId, onResult, onFailure)
+    }
+
     fun getUserWorkZone(onResult: (String) -> Unit, onFailure: (String) -> Unit) {
         val userId = firebaseRepository.getCurrentUserId()
         if (userId == null) {

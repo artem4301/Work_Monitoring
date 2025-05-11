@@ -2,7 +2,6 @@ package com.example.workmonitoring.ui
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -38,10 +37,15 @@ class HomeActivity : AppCompatActivity() {
             }
         )
 
-        // Устанавливаем email текущего пользователя
-        userEmailText.text = homeViewModel.getUserEmail() ?: "Неизвестный пользователь"
+        homeViewModel.getUserFullName(
+            onResult = { name ->
+                userEmailText.text = name
+            },
+            onFailure = {
+                userEmailText.text = "Неизвестный пользователь"
+            }
+        )
 
-        // Делаем кнопку регистрации лица активной по умолчанию
         btnFaceRegistration.isEnabled = true
         btnFaceRegistration.text = "Зарегистрировать лицо"
 
@@ -49,25 +53,20 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, FaceRegistrationActivity::class.java))
         }
 
-        // Проверяем количество эмбеддингов пользователя
         homeViewModel.checkUserEmbeddings(
             onRegistered = {
-                Log.d("HomeActivity", "✅ Пользователь зарегистрирован, кнопка отключена")
                 btnFaceRegistration.text = "Регистрация завершена"
                 btnFaceRegistration.isEnabled = false
             },
             onNotRegistered = {
-                Log.d("HomeActivity", "⚠️ Недостаточно эмбеддингов, кнопка включена")
                 btnFaceRegistration.isEnabled = true
             },
             onFailure = { error ->
-                Log.e("HomeActivity", "❌ Ошибка проверки эмбеддингов: $error")
                 Toast.makeText(this, "Ошибка проверки эмбеддингов: $error", Toast.LENGTH_SHORT).show()
                 btnFaceRegistration.isEnabled = true
             }
         )
 
-        // Кнопка Face ID проверки
         btnFaceControl.setOnClickListener {
             homeViewModel.checkUserEmbeddings(
                 onRegistered = {
@@ -82,7 +81,6 @@ class HomeActivity : AppCompatActivity() {
             )
         }
 
-        // Кнопка выхода
         btnLogout.setOnClickListener {
             homeViewModel.logout()
             startActivity(Intent(this, LoginActivity::class.java))
