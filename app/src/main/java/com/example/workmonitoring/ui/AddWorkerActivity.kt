@@ -7,8 +7,10 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.example.workmonitoring.R
 import com.example.workmonitoring.data.FirebaseRepository
+import com.example.workmonitoring.model.User
 import com.example.workmonitoring.viewmodel.AddWorkerViewModel
 import com.example.workmonitoring.viewmodel.AddWorkerViewModelFactory
+import com.google.android.material.textfield.TextInputLayout
 
 class AddWorkerActivity : AppCompatActivity() {
 
@@ -16,42 +18,39 @@ class AddWorkerActivity : AppCompatActivity() {
         AddWorkerViewModelFactory(FirebaseRepository())
     }
 
-    private lateinit var workersSpinner: Spinner
+    private lateinit var workersSpinner: AutoCompleteTextView
+    private lateinit var spinnerLayout: TextInputLayout
     private lateinit var sendRequestButton: Button
     private lateinit var progressBar: ProgressBar
 
     private var selectedWorkerId: String? = null
+    private var workersList: List<User> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_add_worker)
 
         workersSpinner = findViewById(R.id.workersSpinner)
+        spinnerLayout = findViewById(R.id.spinnerLayout)
         sendRequestButton = findViewById(R.id.sendRequestButton)
         progressBar = findViewById(R.id.progressBar)
         progressBar.visibility = View.VISIBLE
 
         viewModel.loadWorkers()
 
-        viewModel.workers.observe(this) { workersList ->
+        viewModel.workers.observe(this) { workers ->
             progressBar.visibility = View.GONE
-            if (workersList.isNotEmpty()) {
-                val namesList = workersList.map { "${it.firstName} ${it.lastName}" }
-                val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, namesList)
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                workersSpinner.adapter = adapter
+            workersList = workers
+            if (workers.isNotEmpty()) {
+                val namesList = workers.map { "${it.firstName} ${it.lastName}" }
+                val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, namesList)
+                workersSpinner.setAdapter(adapter)
 
-                workersSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                    override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                        selectedWorkerId = workersList[position].uid
-                    }
-
-                    override fun onNothingSelected(parent: AdapterView<*>?) {
-                        selectedWorkerId = null
-                    }
+                workersSpinner.setOnItemClickListener { _, _, position, _ ->
+                    selectedWorkerId = workers[position].uid
                 }
             } else {
-                Toast.makeText(this, "Нет доступных работников", Toast.LENGTH_SHORT).show()
+                spinnerLayout.error = "Нет доступных работников"
             }
         }
 

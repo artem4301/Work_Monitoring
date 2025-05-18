@@ -1,90 +1,225 @@
 package com.example.workmonitoring.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
-import android.widget.Button
+import android.os.Handler
+import android.os.Looper
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.workmonitoring.R
-import com.example.workmonitoring.viewmodel.HomeViewModel
-import com.google.firebase.auth.FirebaseAuth
 import com.example.workmonitoring.data.FirebaseRepository
+import com.example.workmonitoring.service.LocationTrackingService
+import com.google.android.material.button.MaterialButton
+import com.google.firebase.auth.FirebaseAuth
 
 class HomeActivity : AppCompatActivity() {
 
-    private val homeViewModel: HomeViewModel by viewModels {
-        HomeViewModel.Factory(assets, FirebaseRepository(), FirebaseAuth.getInstance())
+    private lateinit var textUserName: TextView
+    private lateinit var textUserEmail: TextView
+    private lateinit var textWorkspaceName: TextView
+    private lateinit var btnFaceRegistration: MaterialButton
+    private lateinit var btnFaceControl: MaterialButton
+    private lateinit var btnLogout: MaterialButton
+    private val repository = FirebaseRepository()
+    private var isInZone = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val zoneCheckRunnable = object : Runnable {
+        override fun run() {
+            checkZoneStatus()
+            handler.postDelayed(this, 5000) // Проверяем каждые 5 секунд
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
 
-        val userEmailText = findViewById<TextView>(R.id.textViewUserEmail)
-        val btnFaceRegistration = findViewById<Button>(R.id.btnFaceRegistration)
-        val btnFaceControl = findViewById<Button>(R.id.btnFaceControl)
-        val btnLogout = findViewById<Button>(R.id.btnLogout)
-        val userZoneText = findViewById<TextView>(R.id.textViewWorkZone)
+        initializeViews()
+        checkLocationPermission()
+        loadUserData()
+        setupClickListeners()
+    }
 
-        homeViewModel.getUserWorkZone(
-            onResult = { address ->
-                userZoneText.text = "Зона: $address"
-            },
-            onFailure = { error ->
-                Toast.makeText(this, "Ошибка загрузки зоны: $error", Toast.LENGTH_SHORT).show()
+    override fun onResume() {
+        super.onResume()
+        handler.post(zoneCheckRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(zoneCheckRunnable)
+    }
+
+    private fun initializeViews() {
+        textUserName = findViewById(R.id.userNameText)
+        textUserEmail = findViewById(R.id.userEmailText)
+        textWorkspaceName = findViewById(R.id.workspaceNameText)
+        btnFaceRegistration = findViewById(R.id.btnFaceRegistration)
+        btnFaceControl = findViewById(R.id.btnFaceControl)
+        btnLogout = findViewById(R.id.btnLogout)
+    }
+
+    private fun checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST_CODE
+            )
+        } else if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE
+            )
+        } else {
+            startLocationService()
+        }
+    }
+
+    private fun startLocationService() {
+        val serviceIntent = Intent(this, LocationTrackingService::class.java)
+        startService(serviceIntent)
+    }
+
+    private fun loadUserData() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        repository.getCurrentUser { user ->
+            if (user != null) {
+                textUserName.text = "${user.firstName} ${user.lastName}"
+                textUserEmail.text = user.email
+
+                if (user.role == "worker") {
+                    loadWorkerData(userId)
+                }
             }
-        )
+        }
+    }
 
-        homeViewModel.getUserFullName(
-            onResult = { name ->
-                userEmailText.text = name
+    private fun loadWorkerData(userId: String) {
+        repository.getUserWorkZone(userId,
+            onSuccess = { address ->
+                repository.getCurrentUser { user ->
+                    if (user != null) {
+                        val radius = user.workZoneRadius ?: 0.0
+                        textWorkspaceName.text = if (radius > 0) {
+                            "$address\nРадиус зоны: ${radius.toInt()} м"
+                        } else {
+                            address
+                        }
+                    }
+                }
             },
             onFailure = {
-                userEmailText.text = "Неизвестный пользователь"
+                textWorkspaceName.text = "Зона не назначена"
             }
         )
 
-        btnFaceRegistration.isEnabled = true
-        btnFaceRegistration.text = "Зарегистрировать лицо"
+        // Проверяем наличие эмбеддингов
+        repository.getUserEmbeddings(
+            userId = userId,
+            onSuccess = { embeddings ->
+                // Если эмбеддинги есть, скрываем кнопку регистрации
+                btnFaceRegistration.visibility = View.GONE
+            },
+            onFailure = {
+                // Если эмбеддингов нет, показываем кнопку регистрации
+                btnFaceRegistration.visibility = View.VISIBLE
+            }
+        )
+
+        // Начинаем периодическую проверку статуса зоны
+        checkZoneStatus()
+    }
+
+    private fun checkZoneStatus() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        repository.getWorkerLocationStatus(userId) { inZone ->
+            isInZone = inZone
+            updateFaceControlButton()
+        }
+    }
+
+    private fun updateFaceControlButton() {
+        btnFaceControl.isEnabled = isInZone
+        btnFaceControl.alpha = if (isInZone) 1.0f else 0.5f
+    }
+
+    private fun setupClickListeners() {
+        btnLogout.setOnClickListener {
+            FirebaseAuth.getInstance().signOut()
+            val intent = Intent(this, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
 
         btnFaceRegistration.setOnClickListener {
             startActivity(Intent(this, FaceRegistrationActivity::class.java))
         }
 
-        homeViewModel.checkUserEmbeddings(
-            onRegistered = {
-                btnFaceRegistration.text = "Регистрация завершена"
-                btnFaceRegistration.isEnabled = false
-            },
-            onNotRegistered = {
-                btnFaceRegistration.isEnabled = true
-            },
-            onFailure = { error ->
-                Toast.makeText(this, "Ошибка проверки эмбеддингов: $error", Toast.LENGTH_SHORT).show()
-                btnFaceRegistration.isEnabled = true
-            }
-        )
-
         btnFaceControl.setOnClickListener {
-            homeViewModel.checkUserEmbeddings(
-                onRegistered = {
-                    startActivity(Intent(this, FaceControlActivity::class.java))
-                },
-                onNotRegistered = {
-                    Toast.makeText(this, "Для прохождения Face ID нужно загрузить 10 фотографий!", Toast.LENGTH_SHORT).show()
-                },
-                onFailure = { error ->
-                    Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
-                }
-            )
+            if (isInZone) {
+                startActivity(Intent(this, FaceControlActivity::class.java))
+            } else {
+                Toast.makeText(
+                    this,
+                    "Вы должны находиться в рабочей зоне для прохождения фотоконтроля",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
+    }
 
-        btnLogout.setOnClickListener {
-            homeViewModel.logout()
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            LOCATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // После получения разрешения на точное местоположение, запрашиваем фоновое
+                    if (ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        ActivityCompat.requestPermissions(
+                            this,
+                            arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                            BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE
+                        )
+                    } else {
+                        startLocationService()
+                    }
+                }
+            }
+            BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    startLocationService()
+                }
+            }
         }
+    }
+
+    companion object {
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
+        private const val BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 1002
     }
 }

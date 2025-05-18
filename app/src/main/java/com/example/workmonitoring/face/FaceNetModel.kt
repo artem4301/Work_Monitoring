@@ -25,26 +25,16 @@ class FaceNetModel(private val assetManager: AssetManager) {
         return byteBuffer
     }
 
-    fun getFaceEmbeddings(bitmap: Bitmap): FloatArray? {
+    fun getFaceEmbeddings(bitmap: Bitmap): Pair<FloatArray, FloatArray>? {
         val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
         val input = preprocessBitmap(resizedBitmap)
         val output = Array(1) { FloatArray(128) }
         interpreter.run(input, output)
-        return l2Normalize(output[0])
+        val rawEmbedding = output[0]
+        val l2Embedding = MathUtils.l2Normalize(rawEmbedding)
+        return Pair(rawEmbedding, l2Embedding)
     }
 
-    private fun l2Normalize(embedding: FloatArray): FloatArray {
-        var sum = 0.0f
-        for (v in embedding) {
-            sum += v * v
-        }
-        val norm = kotlin.math.sqrt(sum)
-        return if (norm > 0f) {
-            FloatArray(embedding.size) { i -> embedding[i] / norm }
-        } else {
-            embedding
-        }
-    }
 
     private fun preprocessBitmap(bitmap: Bitmap): Array<Array<Array<FloatArray>>> {
         val input = Array(1) {
@@ -64,7 +54,6 @@ class FaceNetModel(private val assetManager: AssetManager) {
         }
         return input
     }
-
 
     fun close() {
         interpreter.close()

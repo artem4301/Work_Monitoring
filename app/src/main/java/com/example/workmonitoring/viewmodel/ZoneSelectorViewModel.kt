@@ -43,13 +43,18 @@ class ZoneSelectorViewModel : ViewModel() {
                                 uid = doc.id,
                                 firstName = doc.getString("firstName") ?: "",
                                 lastName = doc.getString("lastName") ?: "",
-                                workZone = doc.getString("workZoneAddress") ?: "Зона не выбрана" // <-- ВАЖНО!
+                                email = doc.getString("email") ?: "",
+                                role = doc.getString("role") ?: "",
+                                workZoneAddress = doc.getString("workZoneAddress"),
+                                workZoneLatitude = doc.getDouble("workZoneLatitude"),
+                                workZoneLongitude = doc.getDouble("workZoneLongitude"),
+                                workZoneRadius = doc.getDouble("workZoneRadius"),
+                                inZone = doc.getBoolean("inZone") ?: false
                             )
                         }
 
                         _workers.postValue(workers)
                     }
-
             }
             .addOnFailureListener { e ->
                 _error.postValue("Ошибка загрузки запросов: ${e.localizedMessage}")

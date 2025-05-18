@@ -1,52 +1,64 @@
 package com.example.workmonitoring.ui
 
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ProgressBar
+import android.view.View
 import android.widget.Toast
-import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.example.workmonitoring.R
-import com.example.workmonitoring.data.FirebaseRepository
-import com.example.workmonitoring.viewmodel.ResetPasswordViewModelFactory
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 
 class ResetPasswordActivity : AppCompatActivity() {
 
-    private val resetPasswordViewModel: ResetPasswordViewModel by viewModels {
-        ResetPasswordViewModelFactory(FirebaseRepository())
-    }
+    private lateinit var auth: FirebaseAuth
+    private lateinit var emailEditText: TextInputEditText
+    private lateinit var resetButton: MaterialButton
+    private lateinit var backButton: MaterialButton
+    private lateinit var progressBar: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_reset_password)
 
-        val emailInput = findViewById<EditText>(R.id.emailInput)
-        val btnResetPassword = findViewById<Button>(R.id.btnResetPassword)
-        val btnBack = findViewById<Button>(R.id.btnBack)
-        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
+        auth = FirebaseAuth.getInstance()
 
-        btnResetPassword.setOnClickListener {
-            val email = emailInput.text.toString().trim()
-            if (email.isNotEmpty()) {
-                resetPasswordViewModel.resetPassword(email)
-            } else {
-                Toast.makeText(this, "Введите email", Toast.LENGTH_SHORT).show()
+        // Инициализация views
+        emailEditText = findViewById(R.id.emailEditText)
+        resetButton = findViewById(R.id.resetButton)
+        backButton = findViewById(R.id.backButton)
+        progressBar = findViewById(R.id.progressBar)
+
+        // Обработчики нажатий
+        resetButton.setOnClickListener {
+            val email = emailEditText.text.toString()
+            if (email.isEmpty()) {
+                Toast.makeText(this, "Введите email для сброса пароля", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+
+            showLoading(true)
+            auth.sendPasswordResetEmail(email)
+                .addOnCompleteListener { task ->
+                    showLoading(false)
+                    if (task.isSuccessful) {
+                        Toast.makeText(this, "Инструкции по сбросу пароля отправлены на ваш email", Toast.LENGTH_LONG).show()
+                        finish()
+                    } else {
+                        Toast.makeText(this, "Ошибка: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
         }
 
-        btnBack.setOnClickListener {
+        backButton.setOnClickListener {
             finish()
         }
+    }
 
-        resetPasswordViewModel.resetPasswordStatus.observe(this) { result ->
-            result.onSuccess {
-                Toast.makeText(this, "Ссылка для сброса отправлена", Toast.LENGTH_SHORT).show()
-            }.onFailure { error ->
-                Toast.makeText(this, error.message, Toast.LENGTH_SHORT).show()
-            }
-        }
+    private fun showLoading(show: Boolean) {
+        progressBar.visibility = if (show) View.VISIBLE else View.GONE
+        resetButton.isEnabled = !show
+        backButton.isEnabled = !show
     }
 }
 

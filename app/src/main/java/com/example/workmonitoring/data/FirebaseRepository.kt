@@ -17,33 +17,37 @@ class FirebaseRepository {
     /**
      * Получает эмбеддинги пользователя из Firestore.
      */
-    fun getUserEmbeddings(userId: String, onSuccess: (List<List<Float>>) -> Unit, onFailure: (String) -> Unit) {
+    fun getUserEmbeddings(
+        userId: String,
+        onSuccess: (List<List<Float>>) -> Unit,
+        onFailure: (String) -> Unit
+    ) {
         db.collection("users")
             .document(userId)
             .get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
-                    val embeddings = document.data?.filterKeys { key ->
-                        key.startsWith("embedding_") && !key.endsWith("_timestamp")
-                    }?.mapNotNull { it.value as? List<Float> } ?: emptyList()
+                    val rawEmbeddings = document.data?.filterKeys { it.startsWith("embedding_raw_") }
 
-                    if (embeddings.isNotEmpty()) {
-                        Log.d("FirebaseRepository", "Загружено ${embeddings.size} эмбеддингов")
+                    if (rawEmbeddings != null && rawEmbeddings.isNotEmpty()) {
+                        val embeddings = rawEmbeddings.entries.sortedBy { it.key }
+                            .mapNotNull { entry ->
+                                (entry.value as? List<*>)?.mapNotNull { it as? Number }?.map { it.toFloat() }
+                            }
+
                         onSuccess(embeddings)
                     } else {
-                        Log.e("FirebaseRepository", "Эмбеддинги не найдены!")
-                        onFailure("Эмбеддинги не найдены в базе данных!")
+                        onFailure("Эмбеддинги не найдены")
                     }
                 } else {
-                    Log.e("FirebaseRepository", "Документ пользователя не найден!")
-                    onFailure("Эмбеддинги не найдены!")
+                    onFailure("Документ пользователя не найден")
                 }
             }
             .addOnFailureListener { e ->
-                Log.e("FirebaseRepository", "Ошибка при загрузке эмбеддингов: ${e.localizedMessage}")
-                onFailure("Ошибка при загрузке данных: ${e.localizedMessage}")
+                onFailure("Ошибка загрузки: ${e.localizedMessage}")
             }
     }
+
 
     /**
      * Сохраняет эмбеддинги пользователя в Firestore.
@@ -56,7 +60,7 @@ class FirebaseRepository {
     ) {
         db.collection("users")
             .document(userId)
-            .set(embeddings, SetOptions.merge()) // Добавляем, а не перезаписываем!
+            .update(embeddings) // Используем update вместо set с merge
             .addOnSuccessListener {
                 onSuccess()
             }
@@ -145,22 +149,7 @@ class FirebaseRepository {
             }
     }
 
-    fun getWorkers(callback: (List<User>) -> Unit) {
-        db.collection("users") // здесь было firestore
-            .whereEqualTo("role", "worker")
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                val workers = querySnapshot.documents.mapNotNull { doc ->
-                    val user = doc.toObject(User::class.java)
-                    user?.uid = doc.id
-                    user
-                }
-                callback(workers)
-            }
-            .addOnFailureListener {
-                callback(emptyList())
-            }
-    }
+
 
     fun sendRequest(workerId: String, callback: (Boolean) -> Unit) {
         val managerId = auth.currentUser?.uid ?: return callback(false)
@@ -221,12 +210,12 @@ class FirebaseRepository {
         radius: Double,
         callback: (Boolean) -> Unit
     ) {
-        val db = FirebaseFirestore.getInstance()
         val zoneData = mapOf(
             "workZoneAddress" to address,
             "workZoneLatitude" to latitude,
             "workZoneLongitude" to longitude,
-            "workZoneRadius" to radius
+            "workZoneRadius" to radius,
+            "inZone" to false
         )
 
         db.collection("users")
@@ -270,6 +259,43 @@ class FirebaseRepository {
             }
     }
 
+    fun getCurrentUser(callback: (User?) -> Unit) {
+        val firebaseUser = auth.currentUser
+        if (firebaseUser != null) {
+            db.collection("users")
+                .document(firebaseUser.uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        val userData = document.data
+                        if (userData != null) {
+                            val user = User(
+                                uid = firebaseUser.uid,
+                                firstName = userData["firstName"] as? String ?: "",
+                                lastName = userData["lastName"] as? String ?: "",
+                                email = firebaseUser.email ?: "",
+                                role = userData["role"] as? String ?: "",
+                                workZoneAddress = userData["workZoneAddress"] as? String,
+                                workZoneLatitude = userData["workZoneLatitude"] as? Double,
+                                workZoneLongitude = userData["workZoneLongitude"] as? Double,
+                                workZoneRadius = userData["workZoneRadius"] as? Double,
+                                inZone = userData["inZone"] as? Boolean ?: false
+                            )
+                            callback(user)
+                        } else {
+                            callback(null)
+                        }
+                    } else {
+                        callback(null)
+                    }
+                }
+                .addOnFailureListener {
+                    callback(null)
+                }
+        } else {
+            callback(null)
+        }
+    }
 
     /**
      * Выход из аккаунта.
@@ -277,5 +303,28 @@ class FirebaseRepository {
     fun logout() {
         auth.signOut()
         Log.d("FirebaseRepository", "Пользователь вышел из системы")
+    }
+
+    fun updateWorkerLocationStatus(userId: String, inZone: Boolean) {
+        db.collection("users")
+            .document(userId)
+            .update("inZone", inZone)
+    }
+
+    fun getWorkerLocationStatus(userId: String, callback: (Boolean) -> Unit) {
+        db.collection("users")
+            .document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val inZone = document.getBoolean("inZone") ?: false
+                    callback(inZone)
+                } else {
+                    callback(false)
+                }
+            }
+            .addOnFailureListener {
+                callback(false)
+            }
     }
 }

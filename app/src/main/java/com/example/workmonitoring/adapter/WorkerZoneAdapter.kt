@@ -9,7 +9,7 @@ import com.example.workmonitoring.R
 import com.example.workmonitoring.model.User
 
 class WorkerZoneAdapter(
-    private val onWorkerClick: (User) -> Unit // <-- новый параметр
+    private val onWorkerClick: (User) -> Unit
 ) : RecyclerView.Adapter<WorkerZoneAdapter.WorkerViewHolder>() {
 
     private var workers: List<User> = emptyList()
@@ -36,7 +36,7 @@ class WorkerZoneAdapter(
 
         fun bind(user: User) {
             textName.text = "${user.lastName} ${user.firstName}"
-            textZone.text = user.workZone ?: "Зона не выбрана"
+            textZone.text = user.workZoneAddress ?: "Зона не выбрана"
 
             itemView.setOnClickListener {
                 onClick(user)

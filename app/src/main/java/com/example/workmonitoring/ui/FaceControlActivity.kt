@@ -2,7 +2,7 @@ package com.example.workmonitoring.ui
 
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.widget.Button
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -14,6 +14,7 @@ import com.example.workmonitoring.data.FirebaseRepository
 import com.example.workmonitoring.face.FaceNetModel
 import com.example.workmonitoring.viewmodel.FaceControlViewModel
 import com.google.firebase.auth.FirebaseAuth
+import com.google.android.material.button.MaterialButton
 
 class FaceControlActivity : AppCompatActivity() {
 
@@ -42,8 +43,8 @@ class FaceControlActivity : AppCompatActivity() {
 
         imagePreview = findViewById(R.id.imagePreview)
         similarityTextView = findViewById(R.id.similarityTextView)
-        val btnCaptureFace = findViewById<Button>(R.id.btnCaptureFace)
-        val btnBack = findViewById<Button>(R.id.btnBack)
+        val btnCaptureFace = findViewById<MaterialButton>(R.id.btnCaptureFace)
+        val btnBack = findViewById<ImageButton>(R.id.btnBack)
 
         btnCaptureFace.setOnClickListener {
             cameraLauncher.launch(null)
