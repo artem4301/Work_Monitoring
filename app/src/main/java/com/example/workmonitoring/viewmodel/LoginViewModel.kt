@@ -1,14 +1,21 @@
-package com.example.workmonitoring.ui
+package com.example.workmonitoring.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.workmonitoring.data.FirebaseRepository
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
-class LoginViewModel(private val firebaseRepository: FirebaseRepository) : ViewModel() {
+class LoginViewModel(
+    private val repository: FirebaseRepository
+) : ViewModel() {
 
-    private val _loginResult = MutableLiveData<Result<Boolean>>()
-    val loginResult: LiveData<Result<Boolean>> = _loginResult
+    private val auth = FirebaseAuth.getInstance()
+    
+    private val _loginResult = MutableLiveData<Result<Unit>>()
+    val loginResult: LiveData<Result<Unit>> = _loginResult
 
     fun login(email: String, password: String) {
         if (email.isEmpty() || password.isEmpty()) {
@@ -16,17 +23,27 @@ class LoginViewModel(private val firebaseRepository: FirebaseRepository) : ViewM
             return
         }
 
-        firebaseRepository.signIn(email, password, {
-            _loginResult.value = Result.success(true)
-        }, { error ->
-            _loginResult.value = Result.failure(Exception(error))
-        })
-    }
-
-    fun loadUserRole(uid: String, callback: (String) -> Unit) {
-        firebaseRepository.getUserRole(uid) { role ->
-            callback(role ?: "worker")  // если что-то пойдет не так — по умолчанию worker
+        viewModelScope.launch {
+            try {
+                auth.signInWithEmailAndPassword(email, password)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            _loginResult.value = Result.success(Unit)
+                        } else {
+                            _loginResult.value = Result.failure(
+                                Exception("Ошибка входа: ${task.exception?.message}")
+                            )
+                        }
+                    }
+            } catch (e: Exception) {
+                _loginResult.value = Result.failure(e)
+            }
         }
     }
 
+    fun loadUserRole(userId: String, onResult: (String) -> Unit) {
+        repository.getCurrentUser { user ->
+            onResult(user?.role ?: "worker")
+        }
+    }
 }

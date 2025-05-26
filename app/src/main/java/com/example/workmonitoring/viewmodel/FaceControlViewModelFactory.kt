@@ -1,4 +1,4 @@
-package com.example.workmonitoring.ui
+package com.example.workmonitoring.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider

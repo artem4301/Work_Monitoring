@@ -15,6 +15,8 @@ import androidx.core.content.ContextCompat
 import com.example.workmonitoring.R
 import com.example.workmonitoring.data.FirebaseRepository
 import com.example.workmonitoring.service.LocationTrackingService
+import com.example.workmonitoring.service.PeriodicVerificationService
+import com.example.workmonitoring.utils.NavigationHelper
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.auth.FirebaseAuth
 
@@ -104,7 +106,32 @@ class HomeActivity : AppCompatActivity() {
                 textUserEmail.text = user.email
 
                 if (user.role == "worker") {
+                    // Отладочные логи
+                    android.util.Log.d("HomeActivity", "User data loaded:")
+                    android.util.Log.d("HomeActivity", "isActive: ${user.isActive}")
+                    android.util.Log.d("HomeActivity", "shiftStartTime: ${user.shiftStartTime}")
+                    android.util.Log.d("HomeActivity", "Should navigate: ${user.isActive == true && user.shiftStartTime != null}")
+                    
+                    // Проверяем активную смену - если есть, переходим к WorkTimeActivity
+                    if (user.isActive == true && user.shiftStartTime != null) {
+                        android.util.Log.d("HomeActivity", "Navigating to WorkTimeActivity")
+                        val intent = NavigationHelper.getAppropriateIntent(this@HomeActivity, user)
+                        startActivity(intent)
+                        finish()
+                        return@getCurrentUser
+                    }
+                    
                     loadWorkerData(userId)
+                    
+                    // Проверяем, требуется ли верификация или смена приостановлена
+                    if (user.verificationRequired || user.shiftPaused) {
+                        showVerificationRequiredDialog(user.pauseReason ?: "Требуется верификация")
+                    }
+                    
+                    // Запускаем сервис периодической верификации если смена активна
+                    if (user.isActive && !user.shiftPaused) {
+                        startPeriodicVerificationService()
+                    }
                 }
             }
         }
@@ -183,6 +210,32 @@ class HomeActivity : AppCompatActivity() {
                 ).show()
             }
         }
+        
+        // Добавляем скрытую кнопку для тестирования (долгое нажатие на логотип)
+        findViewById<View>(R.id.userNameText)?.setOnLongClickListener {
+            startActivity(Intent(this, TestPeriodicVerificationActivity::class.java))
+            true
+        }
+    }
+
+    private fun startPeriodicVerificationService() {
+        val serviceIntent = Intent(this, PeriodicVerificationService::class.java)
+        startService(serviceIntent)
+    }
+
+    private fun showVerificationRequiredDialog(reason: String) {
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Требуется верификация")
+            .setMessage(reason)
+            .setPositiveButton("Пройти верификацию") { _, _ ->
+                val intent = Intent(this, FaceControlActivity::class.java)
+                intent.putExtra("periodic_verification", true)
+                startActivity(intent)
+            }
+            .setCancelable(false)
+            .create()
+        
+        dialog.show()
     }
 
     override fun onRequestPermissionsResult(

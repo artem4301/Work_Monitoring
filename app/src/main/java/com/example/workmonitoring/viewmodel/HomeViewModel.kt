@@ -1,20 +1,40 @@
 package com.example.workmonitoring.viewmodel
 
 import android.content.res.AssetManager
-import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import com.example.workmonitoring.data.FirebaseRepository
+import com.example.workmonitoring.face.FaceNetModel
 import com.google.firebase.auth.FirebaseAuth
 
 class HomeViewModel(
-    private val assetManager: AssetManager,
-    private val firebaseRepository: FirebaseRepository,
+    private val assets: AssetManager,
+    private val repository: FirebaseRepository,
     private val auth: FirebaseAuth
 ) : ViewModel() {
 
-    fun getUserEmail(): String? {
-        return auth.currentUser?.email
+    private val faceNetModel = FaceNetModel(assets)
+
+    fun getUserFullName(onResult: (String) -> Unit, onFailure: (String) -> Unit) {
+        repository.getCurrentUser { user ->
+            if (user != null) {
+                onResult("${user.firstName} ${user.lastName}")
+            } else {
+                onFailure("Не удалось загрузить данные пользователя")
+            }
+        }
+    }
+
+    fun getUserEmail(): String {
+        return auth.currentUser?.email ?: "Не указан"
+    }
+
+    fun getUserWorkZone(onResult: (String) -> Unit, onFailure: () -> Unit) {
+        val userId = auth.currentUser?.uid ?: return
+        repository.getUserWorkZone(
+            userId = userId,
+            onSuccess = onResult,
+            onFailure = { onFailure() }
+        )
     }
 
     fun checkUserEmbeddings(
@@ -22,62 +42,29 @@ class HomeViewModel(
         onNotRegistered: () -> Unit,
         onFailure: (String) -> Unit
     ) {
-        val userId = firebaseRepository.getCurrentUserId()
-        if (userId == null) {
-            onFailure("Пользователь не авторизован!")
-            return
-        }
-
-        firebaseRepository.getUserEmbeddings(userId, { embeddings ->
-            Log.d("HomeViewModel", "Загружено эмбеддингов: ${embeddings.size}") // Логируем данные
-            if (embeddings.isNotEmpty() && embeddings.size >= 10) {
-                onRegistered()
-            } else {
-                onNotRegistered()
+        val userId = auth.currentUser?.uid ?: return
+        repository.getUserEmbeddings(
+            userId = userId,
+            onSuccess = { embeddings ->
+                if (embeddings.isNotEmpty()) {
+                    onRegistered()
+                } else {
+                    onNotRegistered()
+                }
+            },
+            onFailure = { error ->
+                onFailure(error)
+                onNotRegistered() // Показываем кнопку регистрации при ошибке
             }
-        }, { error ->
-            onFailure(error)
-        })
+        )
     }
-
-    fun getUserFullName(onResult: (String) -> Unit, onFailure: (String) -> Unit) {
-        val userId = firebaseRepository.getCurrentUserId()
-        if (userId == null) {
-            onFailure("Пользователь не авторизован")
-            return
-        }
-        firebaseRepository.getUserName(userId, onResult, onFailure)
-    }
-
-    fun getUserWorkZone(onResult: (String) -> Unit, onFailure: (String) -> Unit) {
-        val userId = firebaseRepository.getCurrentUserId()
-        if (userId == null) {
-            onFailure("Пользователь не авторизован!")
-            return
-        }
-
-        firebaseRepository.getUserWorkZone(userId, { zone ->
-            onResult(zone)
-        }, { error ->
-            onFailure(error)
-        })
-    }
-
 
     fun logout() {
-        firebaseRepository.logout()
+        auth.signOut()
     }
 
-    class Factory(
-        private val assetManager: AssetManager,
-        private val firebaseRepository: FirebaseRepository,
-        private val auth: FirebaseAuth
-    ) : ViewModelProvider.Factory {
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-                return HomeViewModel(assetManager, firebaseRepository, auth) as T
-            }
-            throw IllegalArgumentException("Unknown ViewModel class")
-        }
+    override fun onCleared() {
+        super.onCleared()
+        faceNetModel.close()
     }
 }

@@ -52,31 +52,31 @@ class FaceRegistrationViewModel(
             try {
                 _processingState.value = ProcessingState.PROCESSING
                 _lastFailedIndex.value = null
-                
+
                 val result = withContext(Dispatchers.Default) {
                     processImageInBackground(bitmap, onFail)
                 }
 
                 if (result != null) {
                     val (rawEmbedding, normEmbedding) = result
-                    
+
                     // Encrypt embeddings before storing
                     val encryptedRaw = SecurityUtils.encryptData(floatListToByteArray(rawEmbedding))
                     val encryptedNorm = SecurityUtils.encryptData(floatListToByteArray(normEmbedding))
-                    
+
                     // Если это повторная попытка для того же индекса, заменяем старое фото
                     if (index < capturedEmbeddings.size) {
                         capturedEmbeddings[index] = Pair(rawEmbedding, normEmbedding)
                     } else {
                         capturedEmbeddings.add(Pair(rawEmbedding, normEmbedding))
                     }
-                    
+
                     _registrationProgress.value = capturedEmbeddings.size
                     Log.d("FaceRegistration", "Эмбеддинг №$index добавлен, всего: ${capturedEmbeddings.size}")
                 } else {
                     _lastFailedIndex.value = index
                 }
-                
+
                 _processingState.value = ProcessingState.IDLE
             } catch (e: Exception) {
                 Log.e("FaceRegistration", "Ошибка при обработке изображения", e)
@@ -95,14 +95,13 @@ class FaceRegistrationViewModel(
                     onFail("Изображение слишком маленькое. Минимальный размер 120x120 пикселей")
                     return@withContext null
                 }
-                ImageQualityChecker.isImageBlurred(bitmap) -> {
-                    onFail("Фото размытое, пожалуйста сделайте фото заново")
-                    return@withContext null
-                }
-                ImageQualityChecker.isImageTooDark(bitmap) -> {
-                    onFail("Плохое освещение, пожалуйста сделайте фото при лучшем свете")
-                    return@withContext null
-                }
+            }
+
+            // Comprehensive image quality check
+            val qualityResult = ImageQualityChecker.checkImageQuality(bitmap)
+            if (!qualityResult.isGoodQuality) {
+                onFail("Качество изображения недостаточное: ${qualityResult.issues.joinToString(", ")}")
+                return@withContext null
             }
 
             // Generate face embeddings
@@ -113,7 +112,7 @@ class FaceRegistrationViewModel(
             }
 
             val (rawEmbedding, normEmbedding) = embeddings
-            
+
             // Validate embedding quality
             if (rawEmbedding.any { it.isNaN() } || normEmbedding.any { it.isNaN() }) {
                 onFail("Ошибка в генерации эмбеддинга: некорректные значения")
@@ -131,7 +130,7 @@ class FaceRegistrationViewModel(
         viewModelScope.launch {
             try {
                 _processingState.value = ProcessingState.SAVING
-                
+
                 val userId = auth.currentUser?.uid
                 if (userId == null) {
                     onFailure("Пользователь не авторизован")
@@ -238,5 +237,4 @@ class FaceRegistrationViewModel(
         ERROR
     }
 }
-
 

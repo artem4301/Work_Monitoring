@@ -1,3 +1,5 @@
+package com.example.workmonitoring.utils
+
 import kotlin.math.*
 
 object MathUtils {

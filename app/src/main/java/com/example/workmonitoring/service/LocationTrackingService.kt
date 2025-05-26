@@ -103,6 +103,33 @@ class LocationTrackingService : Service() {
             Log.d("LocationService", "Статус зоны изменился: ${if (isInZone) "в зоне" else "вне зоны"}")
             updateNotification()
             updateLocationStatus()
+            handleZoneStatusChange(newIsInZone)
+        }
+    }
+
+    private fun handleZoneStatusChange(currentlyInZone: Boolean) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        
+        repository.getCurrentUser { user ->
+            if (user != null) {
+                if (!currentlyInZone && user.shiftPaused != true) {
+                    // Вышел из зоны и смена не приостановлена - приостанавливаем
+                    repository.pauseShift(userId, "Выход из рабочей зоны") { success ->
+                        if (success) {
+                            Log.d("LocationService", "Смена приостановлена: выход из рабочей зоны")
+                            updateNotification()
+                        }
+                    }
+                } else if (currentlyInZone && user.shiftPaused == true && user.pauseReason == "Выход из рабочей зоны") {
+                    // Вернулся в зону и смена приостановлена по причине выхода из зоны - возобновляем
+                    repository.resumeShift(userId) { success ->
+                        if (success) {
+                            Log.d("LocationService", "Смена возобновлена: возврат в рабочую зону")
+                            updateNotification()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -152,24 +179,36 @@ class LocationTrackingService : Service() {
         }
     }
 
-    private fun createNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setContentTitle("Отслеживание местоположения")
-        .setContentText(
-            if (isInZone) "Вы находитесь в рабочей зоне: $workZoneAddress"
-            else "Вы вне рабочей зоны"
-        )
-        .setSmallIcon(R.drawable.ic_location)
-        .setPriority(NotificationCompat.PRIORITY_HIGH)
-        .setOngoing(true)
-        .setContentIntent(
-            PendingIntent.getActivity(
-                this,
-                0,
-                Intent(this, HomeActivity::class.java),
-                PendingIntent.FLAG_IMMUTABLE
+    private fun createNotification(): android.app.Notification {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        var notificationText = if (isInZone) "Вы находитесь в рабочей зоне: $workZoneAddress" else "Вы вне рабочей зоны"
+        
+        // Проверяем статус паузы для более точного уведомления
+        if (userId != null) {
+            repository.getCurrentUser { user ->
+                if (user?.shiftPaused == true) {
+                    val reason = user.pauseReason ?: "Неизвестная причина"
+                    notificationText = "Смена приостановлена: $reason"
+                }
+            }
+        }
+        
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Отслеживание местоположения")
+            .setContentText(notificationText)
+            .setSmallIcon(R.drawable.ic_location)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this,
+                    0,
+                    Intent(this, HomeActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE
+                )
             )
-        )
-        .build()
+            .build()
+    }
 
     private fun updateNotification() {
         val notificationManager = getSystemService(NotificationManager::class.java)

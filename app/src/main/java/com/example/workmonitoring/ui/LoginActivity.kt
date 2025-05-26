@@ -4,17 +4,19 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.example.workmonitoring.R
+import com.example.workmonitoring.data.FirebaseRepository
+import com.example.workmonitoring.utils.NavigationHelper
+import com.example.workmonitoring.viewmodel.LoginViewModel
+import com.example.workmonitoring.viewmodel.LoginViewModelFactory
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 class LoginActivity : AppCompatActivity() {
 
-    private lateinit var auth: FirebaseAuth
-    private lateinit var db: FirebaseFirestore
     private lateinit var emailEditText: TextInputEditText
     private lateinit var passwordEditText: TextInputEditText
     private lateinit var loginButton: MaterialButton
@@ -22,92 +24,40 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var resetPasswordButton: MaterialButton
     private lateinit var progressBar: View
 
+    private val viewModel: LoginViewModel by viewModels {
+        LoginViewModelFactory(FirebaseRepository())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        auth = FirebaseAuth.getInstance()
-        db = FirebaseFirestore.getInstance()
-
+        initializeViews()
+        
         // Проверяем, авторизован ли пользователь
-        if (auth.currentUser != null) {
-            val currentUserId = auth.currentUser!!.uid
-            db.collection("users")
-                .document(currentUserId)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document.exists()) {
-                        val role = document.getString("role")
-                        if (role == "manager") {
-                            startActivity(Intent(this, ManagerHomeActivity::class.java))
-                        } else {
-                            startActivity(Intent(this, HomeActivity::class.java))
-                        }
-                        finish()
-                    } else {
-                        // Пользователь залогинен, но нет данных в Firestore
-                        auth.signOut()
-                        Toast.makeText(this, "Пользователь не найден. Войдите снова.", Toast.LENGTH_SHORT).show()
-                    }
-                }
-                .addOnFailureListener {
-                    auth.signOut()
-                    Toast.makeText(this, "Ошибка при получении данных пользователя. Войдите снова.", Toast.LENGTH_SHORT).show()
-                }
+        if (FirebaseAuth.getInstance().currentUser != null) {
+            checkUserRoleAndNavigate()
             return
         }
 
-        // Инициализация views
+        setupClickListeners()
+        observeViewModel()
+    }
+
+    private fun initializeViews() {
         emailEditText = findViewById(R.id.emailEditText)
         passwordEditText = findViewById(R.id.passwordEditText)
         loginButton = findViewById(R.id.loginButton)
         registerButton = findViewById(R.id.registerButton)
         resetPasswordButton = findViewById(R.id.resetPasswordButton)
-        progressBar = findViewById(R.id.progressBar)
+        progressBar = findViewById(R.id.progressBar) ?: throw IllegalStateException("ProgressBar not found in layout")
+    }
 
-        // Обработчики нажатий
+    private fun setupClickListeners() {
         loginButton.setOnClickListener {
             val email = emailEditText.text.toString()
             val password = passwordEditText.text.toString()
-
-            if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Пожалуйста, заполните все поля", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            showLoading(true)
-            auth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener(this) { task ->
-                    if (task.isSuccessful) {
-                        val userId = auth.currentUser?.uid
-                        if (userId != null) {
-                            db.collection("users").document(userId).get()
-                                .addOnSuccessListener { document ->
-                                    showLoading(false)
-                                    if (document.exists()) {
-                                        val role = document.getString("role")
-                                        if (role == "manager") {
-                                            startActivity(Intent(this, ManagerHomeActivity::class.java))
-                                        } else {
-                                            startActivity(Intent(this, HomeActivity::class.java))
-                                        }
-                                        finish()
-                                    } else {
-                                        Toast.makeText(this, "Пользователь не найден", Toast.LENGTH_SHORT).show()
-                                        auth.signOut()
-                                    }
-                                }
-                                .addOnFailureListener { e ->
-                                    showLoading(false)
-                                    Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    auth.signOut()
-                                }
-                        }
-                    } else {
-                        showLoading(false)
-                        Toast.makeText(this, "Ошибка входа: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                    }
-                }
+            viewModel.login(email, password)
         }
 
         registerButton.setOnClickListener {
@@ -119,10 +69,74 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    private fun observeViewModel() {
+        viewModel.loginResult.observe(this) { result ->
+            showLoading(false)
+            
+            result.onSuccess {
+                checkUserRoleAndNavigate()
+            }.onFailure { error ->
+                Toast.makeText(this, error.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun checkUserRoleAndNavigate() {
+        showLoading(true)
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        
+        if (userId != null) {
+            viewModel.loadUserRole(userId) { role ->
+                if (role == "manager") {
+                    showLoading(false)
+                    val intent = Intent(this, ManagerHomeActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                } else {
+                    // Для работников проверяем активную смену
+                    checkActiveShiftAndNavigate(userId)
+                }
+            }
+        } else {
+            showLoading(false)
+            Toast.makeText(this, "Ошибка авторизации", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun checkActiveShiftAndNavigate(userId: String) {
+        val repository = FirebaseRepository()
+        repository.getCurrentUser { user ->
+            showLoading(false)
+            
+            if (user != null) {
+                // Отладочные логи
+                android.util.Log.d("LoginActivity", "User data loaded:")
+                android.util.Log.d("LoginActivity", "role: ${user.role}")
+                android.util.Log.d("LoginActivity", "isActive: ${user.isActive}")
+                android.util.Log.d("LoginActivity", "shiftStartTime: ${user.shiftStartTime}")
+                
+                val intent = NavigationHelper.getAppropriateIntent(this, user)
+                android.util.Log.d("LoginActivity", "Navigating to: ${intent.component?.className}")
+                startActivity(intent)
+                finish()
+            } else {
+                Toast.makeText(this, "Ошибка загрузки данных пользователя", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun showLoading(show: Boolean) {
-        progressBar.visibility = if (show) View.VISIBLE else View.GONE
-        loginButton.isEnabled = !show
-        registerButton.isEnabled = !show
-        resetPasswordButton.isEnabled = !show
+        if (::progressBar.isInitialized) {
+            progressBar.visibility = if (show) View.VISIBLE else View.GONE
+        }
+        if (::loginButton.isInitialized) {
+            loginButton.isEnabled = !show
+        }
+        if (::registerButton.isInitialized) {
+            registerButton.isEnabled = !show
+        }
+        if (::resetPasswordButton.isInitialized) {
+            resetPasswordButton.isEnabled = !show
+        }
     }
 }

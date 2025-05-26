@@ -1,134 +1,103 @@
 package com.example.workmonitoring.utils
 
-import android.util.Log
-
 /**
- * Utility class for analyzing face similarity using cosine similarity.
- * Handles both normalized and non-normalized input vectors.
+ * Анализатор сходства лиц - обертка над SimilarityMetrics для удобства использования
  */
 class FaceSimilarityAnalyzer {
-    companion object {
-        private const val TAG = "FaceSimilarityAnalyzer"
-        const val DEFAULT_THRESHOLD = 75f // Default threshold for face matching
-    }
 
-    /**
-     * Result of face similarity analysis containing individual metric scores
-     * and match decision.
-     */
     data class SimilarityResult(
-        val cosine: Float,    // Cosine similarity [0%, 100%]
-        val euclidean: Float, // Euclidean similarity [0%, 100%]
-        val isMatch: Boolean  // Whether the faces match based on threshold
+        val cosine: Float,
+        val euclidean: Float,
+        val manhattan: Float,
+        val pearson: Float,
+        val jaccard: Float,
+        val bestScore: Float,
+        val bestMetric: String,
+        val isMatch: Boolean
     )
 
     /**
-     * Analyzes similarity between two face embeddings using cosine similarity.
-     * Returns detailed similarity scores and match decision.
+     * Анализирует сходство между двумя эмбеддингами лиц
      */
     fun analyzeSimilarity(
         embedding1: List<Float>,
         embedding2: List<Float>,
-        threshold: Float = DEFAULT_THRESHOLD
+        threshold: Float = 0.75f
     ): SimilarityResult {
-        val cosine = SimilarityMetrics.cosineSimilarity(embedding1, embedding2)
-        val euclidean = SimilarityMetrics.euclideanSimilarity(embedding1, embedding2)
-        val isMatch = cosine >= threshold
+        
+        val cosine = SimilarityMetrics.calculateSimilarity(
+            embedding1, embedding2, SimilarityMetrics.SimilarityMetric.COSINE
+        )
+        
+        val euclidean = SimilarityMetrics.calculateSimilarity(
+            embedding1, embedding2, SimilarityMetrics.SimilarityMetric.EUCLIDEAN
+        )
+        
+        val manhattan = SimilarityMetrics.calculateSimilarity(
+            embedding1, embedding2, SimilarityMetrics.SimilarityMetric.MANHATTAN
+        )
+        
+        val pearson = SimilarityMetrics.calculateSimilarity(
+            embedding1, embedding2, SimilarityMetrics.SimilarityMetric.PEARSON
+        )
+        
+        val jaccard = SimilarityMetrics.calculateSimilarity(
+            embedding1, embedding2, SimilarityMetrics.SimilarityMetric.JACCARD
+        )
 
-        // Log results for analysis
-        Log.d(TAG, """
-            Face similarity analysis:
-            Cosine: $cosine%
-            Euclidean: $euclidean%
-            Threshold: $threshold%
-            Result: ${if (isMatch) "MATCH" else "NO MATCH"}
-        """.trimIndent())
+        // Определяем лучший результат (теперь только по косинусной метрике)
+        val metrics = mapOf(
+            "Косинусная" to cosine,
+            "Евклидова" to euclidean,
+            "Манхэттенская" to manhattan,
+            "Пирсона" to pearson,
+            "Жаккара" to jaccard
+        )
+        
+        // Верификация основывается только на косинусной метрике
+        val bestScore = cosine
+        val bestMetric = "Косинусная"
+        val isMatch = cosine >= threshold
 
         return SimilarityResult(
             cosine = cosine,
             euclidean = euclidean,
+            manhattan = manhattan,
+            pearson = pearson,
+            jaccard = jaccard,
+            bestScore = bestScore,
+            bestMetric = bestMetric,
             isMatch = isMatch
         )
     }
 
     /**
-     * Finds the best matching face embedding from a list of candidates.
-     * Returns the best match result and its index if similarity is above threshold.
+     * Анализирует сходство с множественными сохраненными эмбеддингами
      */
-    fun findBestMatch(
-        targetEmbedding: List<Float>,
-        candidateEmbeddings: List<List<Float>>,
-        threshold: Float = DEFAULT_THRESHOLD
-    ): Pair<SimilarityResult, Int>? {
-        if (candidateEmbeddings.isEmpty()) return null
-
-        var bestMatch: SimilarityResult? = null
-        var bestMatchIndex = -1
-        var maxCosine = -1f
-
-        candidateEmbeddings.forEachIndexed { index, candidate ->
-            val result = analyzeSimilarity(targetEmbedding, candidate, threshold)
-            if (result.cosine > maxCosine) {
-                maxCosine = result.cosine
-                bestMatch = result
-                bestMatchIndex = index
+    fun analyzeMultipleSimilarity(
+        currentEmbedding: List<Float>,
+        storedEmbeddings: List<List<Float>>,
+        threshold: Float = 0.75f
+    ): SimilarityResult {
+        
+        var bestResult: SimilarityResult? = null
+        
+        storedEmbeddings.forEach { stored ->
+            val result = analyzeSimilarity(currentEmbedding, stored, threshold)
+            if (bestResult == null || result.bestScore > bestResult!!.bestScore) {
+                bestResult = result
             }
         }
-
-        return bestMatch?.let { result ->
-            if (result.isMatch) {
-                Pair(result, bestMatchIndex)
-            } else null
-        }
-    }
-
-    /**
-     * Evaluates recognition accuracy on test data.
-     */
-    fun evaluateAccuracy(
-        positiveTests: List<Pair<List<Float>, List<Float>>>, // pairs of same person
-        negativeTests: List<Pair<List<Float>, List<Float>>>, // pairs of different people
-        threshold: Float = DEFAULT_THRESHOLD
-    ): AccuracyMetrics {
-        var truePositives = 0
-        var falsePositives = 0
-        var trueNegatives = 0
-        var falseNegatives = 0
-
-        // Check positive tests (should match)
-        positiveTests.forEach { (emb1, emb2) ->
-            val result = analyzeSimilarity(emb1, emb2, threshold)
-            if (result.isMatch) truePositives++ else falseNegatives++
-        }
-
-        // Check negative tests (should not match)
-        negativeTests.forEach { (emb1, emb2) ->
-            val result = analyzeSimilarity(emb1, emb2, threshold)
-            if (result.isMatch) falsePositives++ else trueNegatives++
-        }
-
-        return AccuracyMetrics(
-            accuracy = (truePositives + trueNegatives).toFloat() / (positiveTests.size + negativeTests.size),
-            precision = truePositives.toFloat() / (truePositives + falsePositives),
-            recall = truePositives.toFloat() / (truePositives + falseNegatives),
-            falsePositiveRate = falsePositives.toFloat() / (falsePositives + trueNegatives)
+        
+        return bestResult ?: SimilarityResult(
+            cosine = 0f,
+            euclidean = 0f,
+            manhattan = 0f,
+            pearson = 0f,
+            jaccard = 0f,
+            bestScore = 0f,
+            bestMetric = "Нет данных",
+            isMatch = false
         )
-    }
-
-    data class AccuracyMetrics(
-        val accuracy: Float,  // overall accuracy
-        val precision: Float, // precision of positive predictions
-        val recall: Float,    // recall
-        val falsePositiveRate: Float // false positive rate
-    ) {
-        fun toDetailedString(): String {
-            return """
-                Accuracy metrics:
-                Overall accuracy: ${String.format("%.2f", accuracy * 100)}%
-                Precision: ${String.format("%.2f", precision * 100)}%
-                Recall: ${String.format("%.2f", recall * 100)}%
-                False positive rate: ${String.format("%.2f", falsePositiveRate * 100)}%
-            """.trimIndent()
-        }
     }
 } 
